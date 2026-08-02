@@ -1,0 +1,137 @@
+name: Invoice Fraud Report
+description: "Parse an invoice, run it through fraud detection, then generate an executive\
+  \ report \u2014 built from scratch to demonstrate explicit_mapping edge transforms\
+  \ across genuinely incompatible schemas"
+namespace: acme/finance
+architecture: sequential
+environment: dev
+orchestrator_config:
+  llm_model: null
+  conditions: null
+  engine_type: chain_executor
+  routing_mode: sequential
+  system_prompt: 'Process an invoice end-to-end: extract structured data, screen for
+    fraud, summarize findings for finance leadership'
+  max_iterations: 5
+  merge_agent_id: null
+  merge_strategy: null
+  transport_mode: centralized
+  llm_temperature: null
+  fallback_agent_id: null
+  quality_threshold: null
+  reflection_prompt: null
+  quality_metric_key: null
+  reflection_enabled: null
+  max_refinement_loops: null
+  allow_partial_results: null
+  fanout_timeout_seconds: null
+memory_config:
+  open: true
+  schema: null
+  strict: false
+  strategy: shared_bus
+  persistence: session
+  initial_context: null
+  max_memory_keys: 100
+  memory_ttl_seconds: null
+error_recovery:
+  dead_letter_queue: true
+  max_total_retries: 10
+  on_system_failure: return_partial
+  global_timeout_seconds: 180
+  circuit_breaker_enabled: true
+  circuit_breaker_threshold: 3
+  circuit_breaker_reset_seconds: 60
+observability:
+  log_level: info
+  trace_enabled: true
+  metrics_enabled: true
+  trace_include_io: true
+  webhook_on_failure: null
+  webhook_on_complete: null
+  trace_include_memory: true
+nodes:
+- id: extract
+  config:
+    retries: 2
+    on_failure: abort
+    input_mapping: null
+    memory_access: read-write
+    retry_backoff: fixed
+    system_prompt: null
+    output_mapping: null
+    rate_limit_rpm: null
+    retry_delay_ms: 1000
+    timeout_seconds: 30
+    cache_ttl_seconds: null
+    fallback_agent_id: null
+  agent_id: 4dacef11-4a27-4344-975b-08283bcff78d
+  position:
+    x: 100.0
+    y: 250.0
+  agent_version: latest
+- id: fraud_check
+  config:
+    retries: 2
+    on_failure: abort
+    input_mapping: null
+    memory_access: read-write
+    retry_backoff: fixed
+    system_prompt: null
+    output_mapping: null
+    rate_limit_rpm: null
+    retry_delay_ms: 1000
+    timeout_seconds: 30
+    cache_ttl_seconds: null
+    fallback_agent_id: null
+  agent_id: 2f565a6b-06b9-4a66-a882-4df2238dc1d4
+  position:
+    x: 450.0
+    y: 250.0
+  agent_version: latest
+- id: report
+  config:
+    retries: 2
+    on_failure: abort
+    input_mapping: null
+    memory_access: read-write
+    retry_backoff: fixed
+    system_prompt: null
+    output_mapping: null
+    rate_limit_rpm: null
+    retry_delay_ms: 1000
+    timeout_seconds: 30
+    cache_ttl_seconds: null
+    fallback_agent_id: null
+  agent_id: 69d1924f-740d-47a0-9c6c-75db27f1ace6
+  position:
+    x: 800.0
+    y: 250.0
+  agent_version: latest
+edges:
+- id: e1
+  condition: null
+  transform:
+    mappings:
+      transaction: $
+    strategy: explicit_mapping
+    llm_model: null
+    llm_prompt: null
+  memory_keys: null
+  memory_pass: full
+  source_node_id: extract
+  target_node_id: fraud_check
+  schema_compatibility: null
+- id: e2
+  condition: null
+  transform:
+    mappings:
+      data: $
+    strategy: explicit_mapping
+    llm_model: null
+    llm_prompt: null
+  memory_keys: null
+  memory_pass: full
+  source_node_id: fraud_check
+  target_node_id: report
+  schema_compatibility: null

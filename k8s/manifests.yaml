@@ -1,0 +1,651 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: yard-invoice-fraud-report
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: yard-invoice-fraud-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - image: redis:7-alpine
+        name: redis
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: yard-invoice-fraud-report
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: orchestrator
+    yard-system: yard-invoice-fraud-report
+  name: orchestrator
+  namespace: yard-invoice-fraud-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+        yard-system: yard-invoice-fraud-report
+    spec:
+      containers:
+      - env:
+        - name: YARD_SYSTEM_ID
+          value: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+        - name: YARD_TRANSPORT
+          value: http
+        - name: YARD_REDIS_URL
+          value: redis://redis:6379
+        - name: YARD_ENGINE_TYPE
+          value: chain_executor
+        - name: YARD_OTLP_ENDPOINT
+          value: http://jaeger:4318/v1/traces
+        - name: YARD_ROLE
+          value: in-cluster-orchestrator
+        - name: YARD_SYSTEM_SPEC_PATH
+          value: /etc/agentyard/system.json
+        image: agentyard-engine:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: orchestrator
+        ports:
+        - containerPort: 8003
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /etc/agentyard
+          name: yard-system-spec
+          readOnly: true
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+      volumes:
+      - configMap:
+          name: yard-system-spec
+        name: yard-system-spec
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  namespace: yard-invoice-fraud-report
+spec:
+  ports:
+  - nodePort: 30311
+    port: 8003
+    targetPort: 8003
+  selector:
+    app: orchestrator
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: invoice-processor-agent
+    yard-system: yard-invoice-fraud-report
+  name: invoice-processor-agent
+  namespace: yard-invoice-fraud-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: invoice-processor-agent
+  template:
+    metadata:
+      labels:
+        app: invoice-processor-agent
+        yard-system: yard-invoice-fraud-report
+    spec:
+      containers:
+      - env:
+        - name: YARD_TRANSPORT
+          value: http
+        - name: YARD_SYSTEM_ID
+          value: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+        - name: YARD_NODE_ID
+          value: extract
+        - name: YARD_REDIS_URL
+          value: redis://redis:6379
+        - name: YARD_PORT
+          value: '9000'
+        - name: YARD_OTLP_ENDPOINT
+          value: http://jaeger:4318/v1/traces
+        - name: YARD_LLM_PROVIDER
+          value: bedrock
+        - name: YARD_MEMORY
+          value: shared_bus
+        image: agentyard-invoice-processor-agent:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: invoice-processor-agent
+        ports:
+        - containerPort: 9000
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /yard/config.yaml
+          name: yard-config
+          readOnly: true
+          subPath: extract.yaml
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+      volumes:
+      - configMap:
+          name: yard-node-configs
+        name: yard-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: invoice-processor-agent
+  namespace: yard-invoice-fraud-report
+spec:
+  ports:
+  - port: 9000
+    targetPort: 9000
+  selector:
+    app: invoice-processor-agent
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: fraud-detector-agent
+    yard-system: yard-invoice-fraud-report
+  name: fraud-detector-agent
+  namespace: yard-invoice-fraud-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-detector-agent
+  template:
+    metadata:
+      labels:
+        app: fraud-detector-agent
+        yard-system: yard-invoice-fraud-report
+    spec:
+      containers:
+      - env:
+        - name: YARD_TRANSPORT
+          value: http
+        - name: YARD_SYSTEM_ID
+          value: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+        - name: YARD_NODE_ID
+          value: fraud_check
+        - name: YARD_REDIS_URL
+          value: redis://redis:6379
+        - name: YARD_PORT
+          value: '9000'
+        - name: YARD_OTLP_ENDPOINT
+          value: http://jaeger:4318/v1/traces
+        - name: YARD_LLM_PROVIDER
+          value: bedrock
+        - name: YARD_MEMORY
+          value: shared_bus
+        image: agentyard-fraud-detector-agent:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: fraud-detector-agent
+        ports:
+        - containerPort: 9000
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /yard/config.yaml
+          name: yard-config
+          readOnly: true
+          subPath: fraud_check.yaml
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+      volumes:
+      - configMap:
+          name: yard-node-configs
+        name: yard-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-detector-agent
+  namespace: yard-invoice-fraud-report
+spec:
+  ports:
+  - port: 9000
+    targetPort: 9000
+  selector:
+    app: fraud-detector-agent
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: report-generator-agent
+    yard-system: yard-invoice-fraud-report
+  name: report-generator-agent
+  namespace: yard-invoice-fraud-report
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: report-generator-agent
+  template:
+    metadata:
+      labels:
+        app: report-generator-agent
+        yard-system: yard-invoice-fraud-report
+    spec:
+      containers:
+      - env:
+        - name: YARD_TRANSPORT
+          value: http
+        - name: YARD_SYSTEM_ID
+          value: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+        - name: YARD_NODE_ID
+          value: report
+        - name: YARD_REDIS_URL
+          value: redis://redis:6379
+        - name: YARD_PORT
+          value: '9000'
+        - name: YARD_OTLP_ENDPOINT
+          value: http://jaeger:4318/v1/traces
+        - name: YARD_LLM_PROVIDER
+          value: bedrock
+        - name: YARD_MEMORY
+          value: shared_bus
+        image: 742851378787.dkr.ecr.us-east-1.amazonaws.com/agentyard-report-generator-agent:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: report-generator-agent
+        ports:
+        - containerPort: 9000
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /yard/config.yaml
+          name: yard-config
+          readOnly: true
+          subPath: report.yaml
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+      volumes:
+      - configMap:
+          name: yard-node-configs
+        name: yard-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: report-generator-agent
+  namespace: yard-invoice-fraud-report
+spec:
+  ports:
+  - port: 9000
+    targetPort: 9000
+  selector:
+    app: report-generator-agent
+  type: ClusterIP
+---
+apiVersion: v1
+data:
+  extract.yaml: "system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nnode_id: extract\n\
+    transport_mode: centralized\ninput_mode: http\noutput_mode: sync\nmemory:\n  reads:\
+    \ []\n  writes:\n  - invoice_extraction\n  scope: system\nfailure:\n  mode: retry\n\
+    \  max_retries: 3\n"
+  fraud_check.yaml: "system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nnode_id: fraud_check\n\
+    transport_mode: centralized\ninput_mode: http\noutput_mode: sync\nmemory:\n  reads:\
+    \ []\n  writes:\n  - fraud_assessment\n  scope: system\nfailure:\n  mode: retry\n\
+    \  max_retries: 3\n"
+  report.yaml: "system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nnode_id: report\n\
+    transport_mode: centralized\ninput_mode: http\noutput_mode: sync\nmemory:\n  reads:\
+    \ []\n  writes:\n  - generated_report\n  scope: system\nfailure:\n  mode: retry\n\
+    \  max_retries: 3\n"
+kind: ConfigMap
+metadata:
+  name: yard-node-configs
+  namespace: yard-invoice-fraud-report
+---
+apiVersion: v1
+data:
+  system.json: "architecture: sequential\ncreated_at: '2026-08-01T23:28:06.900621Z'\n\
+    description: \"Parse an invoice, run it through fraud detection, then generate\
+    \ an executive\\\n  \\ report \\u2014 built from scratch to demonstrate explicit_mapping\
+    \ edge transforms\\\n  \\ across genuinely incompatible schemas\"\nedges:\n- condition:\
+    \ null\n  id: e1\n  memory_keys: null\n  memory_pass: full\n  schema_compatibility:\
+    \ null\n  source_node_id: extract\n  target_node_id: fraud_check\n  transform:\n\
+    \    llm_model: null\n    llm_prompt: null\n    mappings:\n      transaction:\
+    \ $\n    strategy: explicit_mapping\n- condition: null\n  id: e2\n  memory_keys:\
+    \ null\n  memory_pass: full\n  schema_compatibility: null\n  source_node_id: fraud_check\n\
+    \  target_node_id: report\n  transform:\n    llm_model: null\n    llm_prompt:\
+    \ null\n    mappings:\n      data: $\n    strategy: explicit_mapping\nenvironment:\
+    \ dev\nerror_recovery:\n  circuit_breaker_enabled: true\n  circuit_breaker_reset_seconds:\
+    \ 60\n  circuit_breaker_threshold: 3\n  dead_letter_queue: true\n  global_timeout_seconds:\
+    \ 180\n  max_total_retries: 10\n  on_system_failure: return_partial\ngithub_repo_url:\
+    \ null\nglobal_token: null\nid: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nmemory_config:\n\
+    \  initial_context: null\n  max_memory_keys: 100\n  memory_ttl_seconds: null\n\
+    \  open: true\n  persistence: session\n  schema: null\n  strategy: shared_bus\n\
+    \  strict: false\nname: Invoice Fraud Report\nnamespace: acme/finance\nnodes:\n\
+    - agent_id: 4dacef11-4a27-4344-975b-08283bcff78d\n  agent_version: latest\n  config:\n\
+    \    cache_ttl_seconds: null\n    fallback_agent_id: null\n    input_mapping:\
+    \ null\n    memory_access: read-write\n    on_failure: abort\n    output_mapping:\
+    \ null\n    rate_limit_rpm: null\n    retries: 2\n    retry_backoff: fixed\n \
+    \   retry_delay_ms: 1000\n    system_prompt: null\n    timeout_seconds: 30\n \
+    \ id: extract\n  position:\n    x: 100.0\n    y: 250.0\n- agent_id: 2f565a6b-06b9-4a66-a882-4df2238dc1d4\n\
+    \  agent_version: latest\n  config:\n    cache_ttl_seconds: null\n    fallback_agent_id:\
+    \ null\n    input_mapping: null\n    memory_access: read-write\n    on_failure:\
+    \ abort\n    output_mapping: null\n    rate_limit_rpm: null\n    retries: 2\n\
+    \    retry_backoff: fixed\n    retry_delay_ms: 1000\n    system_prompt: null\n\
+    \    timeout_seconds: 30\n  id: fraud_check\n  position:\n    x: 450.0\n    y:\
+    \ 250.0\n- agent_id: 69d1924f-740d-47a0-9c6c-75db27f1ace6\n  agent_version: latest\n\
+    \  config:\n    cache_ttl_seconds: null\n    fallback_agent_id: null\n    input_mapping:\
+    \ null\n    memory_access: read-write\n    on_failure: abort\n    output_mapping:\
+    \ null\n    rate_limit_rpm: null\n    retries: 2\n    retry_backoff: fixed\n \
+    \   retry_delay_ms: 1000\n    system_prompt: null\n    timeout_seconds: 30\n \
+    \ id: report\n  position:\n    x: 800.0\n    y: 250.0\nobservability:\n  log_level:\
+    \ info\n  metrics_enabled: true\n  trace_enabled: true\n  trace_include_io: true\n\
+    \  trace_include_memory: true\n  webhook_on_complete: null\n  webhook_on_failure:\
+    \ null\norchestrator_config:\n  allow_partial_results: null\n  conditions: null\n\
+    \  engine_type: chain_executor\n  fallback_agent_id: null\n  fanout_timeout_seconds:\
+    \ null\n  llm_model: null\n  llm_temperature: null\n  max_iterations: 5\n  max_refinement_loops:\
+    \ null\n  merge_agent_id: null\n  merge_strategy: null\n  quality_metric_key:\
+    \ null\n  quality_threshold: null\n  reflection_enabled: null\n  reflection_prompt:\
+    \ null\n  routing_mode: sequential\n  system_prompt: 'Process an invoice end-to-end:\
+    \ extract structured data, screen for\n    fraud, summarize findings for finance\
+    \ leadership'\n  transport_mode: centralized\nowner: dev-admin\nstatus: deployed\n\
+    updated_at: '2026-08-01T23:28:16.245106Z'\nversion: 2\n"
+  transport: http
+kind: ConfigMap
+metadata:
+  name: system-config
+  namespace: yard-invoice-fraud-report
+---
+apiVersion: v1
+data:
+  system.json: "{\n  \"id\": \"e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\",\n  \"name\"\
+    : \"Invoice Fraud Report\",\n  \"engine_type\": \"chain_executor\",\n  \"transport_mode\"\
+    : \"centralized\",\n  \"orchestrator_config\": {\n    \"llm_model\": null,\n \
+    \   \"conditions\": null,\n    \"engine_type\": \"chain_executor\",\n    \"routing_mode\"\
+    : \"sequential\",\n    \"system_prompt\": \"Process an invoice end-to-end: extract\
+    \ structured data, screen for fraud, summarize findings for finance leadership\"\
+    ,\n    \"max_iterations\": 5,\n    \"merge_agent_id\": null,\n    \"merge_strategy\"\
+    : null,\n    \"transport_mode\": \"centralized\",\n    \"llm_temperature\": null,\n\
+    \    \"fallback_agent_id\": null,\n    \"quality_threshold\": null,\n    \"reflection_prompt\"\
+    : null,\n    \"quality_metric_key\": null,\n    \"reflection_enabled\": null,\n\
+    \    \"max_refinement_loops\": null,\n    \"allow_partial_results\": null,\n \
+    \   \"fanout_timeout_seconds\": null\n  },\n  \"memory_config\": {\n    \"open\"\
+    : true,\n    \"schema\": null,\n    \"strict\": false,\n    \"strategy\": \"shared_bus\"\
+    ,\n    \"persistence\": \"session\",\n    \"initial_context\": null,\n    \"max_memory_keys\"\
+    : 100,\n    \"memory_ttl_seconds\": null\n  },\n  \"edges\": [\n    {\n      \"\
+    id\": \"e1\",\n      \"condition\": null,\n      \"transform\": {\n        \"\
+    mappings\": {\n          \"transaction\": \"$\"\n        },\n        \"strategy\"\
+    : \"explicit_mapping\",\n        \"llm_model\": null,\n        \"llm_prompt\"\
+    : null\n      },\n      \"memory_keys\": null,\n      \"memory_pass\": \"full\"\
+    ,\n      \"source_node_id\": \"extract\",\n      \"target_node_id\": \"fraud_check\"\
+    ,\n      \"schema_compatibility\": null\n    },\n    {\n      \"id\": \"e2\",\n\
+    \      \"condition\": null,\n      \"transform\": {\n        \"mappings\": {\n\
+    \          \"data\": \"$\"\n        },\n        \"strategy\": \"explicit_mapping\"\
+    ,\n        \"llm_model\": null,\n        \"llm_prompt\": null\n      },\n    \
+    \  \"memory_keys\": null,\n      \"memory_pass\": \"full\",\n      \"source_node_id\"\
+    : \"fraud_check\",\n      \"target_node_id\": \"report\",\n      \"schema_compatibility\"\
+    : null\n    }\n  ],\n  \"nodes\": [\n    {\n      \"id\": \"extract\",\n     \
+    \ \"agent_id\": \"4dacef11-4a27-4344-975b-08283bcff78d\",\n      \"agent_name\"\
+    : \"invoice-processor-agent\",\n      \"agent_version\": \"latest\",\n      \"\
+    a2a_endpoint\": \"http://invoice-processor-agent.yard-invoice-fraud-report.svc.cluster.local:9000\"\
+    ,\n      \"input_schema\": {\n        \"type\": \"object\",\n        \"title\"\
+    : \"Input\",\n        \"required\": [\n          \"text\"\n        ],\n      \
+    \  \"properties\": {\n          \"text\": {\n            \"type\": \"string\"\
+    ,\n            \"title\": \"Text\"\n          },\n          \"currency\": {\n\
+    \            \"type\": \"string\",\n            \"title\": \"Currency\",\n   \
+    \         \"default\": \"USD\"\n          }\n        }\n      },\n      \"output_schema\"\
+    : {\n        \"type\": \"object\",\n        \"title\": \"Output\",\n        \"\
+    properties\": {\n          \"tax\": {\n            \"type\": \"number\",\n   \
+    \         \"title\": \"Tax\",\n            \"default\": 0.0\n          },\n  \
+    \        \"date\": {\n            \"type\": \"string\",\n            \"title\"\
+    : \"Date\",\n            \"default\": \"Unknown\"\n          },\n          \"\
+    total\": {\n            \"type\": \"number\",\n            \"title\": \"Total\"\
+    ,\n            \"default\": 0.0\n          },\n          \"vendor\": {\n     \
+    \       \"type\": \"string\",\n            \"title\": \"Vendor\",\n          \
+    \  \"default\": \"Unknown\"\n          },\n          \"currency\": {\n       \
+    \     \"type\": \"string\",\n            \"title\": \"Currency\",\n          \
+    \  \"default\": \"USD\"\n          },\n          \"subtotal\": {\n           \
+    \ \"type\": \"number\",\n            \"title\": \"Subtotal\",\n            \"\
+    default\": 0.0\n          },\n          \"po_number\": {\n            \"anyOf\"\
+    : [\n              {\n                \"type\": \"string\"\n              },\n\
+    \              {\n                \"type\": \"null\"\n              }\n      \
+    \      ],\n            \"title\": \"Po Number\",\n            \"default\": null\n\
+    \          },\n          \"confidence\": {\n            \"type\": \"number\",\n\
+    \            \"title\": \"Confidence\",\n            \"default\": 0.0\n      \
+    \    },\n          \"line_items\": {\n            \"type\": \"array\",\n     \
+    \       \"items\": {\n              \"type\": \"object\",\n              \"additionalProperties\"\
+    : true\n            },\n            \"title\": \"Line Items\"\n          },\n\
+    \          \"payment_terms\": {\n            \"type\": \"string\",\n         \
+    \   \"title\": \"Payment Terms\",\n            \"default\": \"Unknown\"\n    \
+    \      },\n          \"invoice_number\": {\n            \"type\": \"string\",\n\
+    \            \"title\": \"Invoice Number\",\n            \"default\": \"Unknown\"\
+    \n          }\n        }\n      },\n      \"config\": {\n        \"retries\":\
+    \ 2,\n        \"on_failure\": \"abort\",\n        \"input_mapping\": null,\n \
+    \       \"memory_access\": \"read-write\",\n        \"retry_backoff\": \"fixed\"\
+    ,\n        \"system_prompt\": null,\n        \"output_mapping\": null,\n     \
+    \   \"rate_limit_rpm\": null,\n        \"retry_delay_ms\": 1000,\n        \"timeout_seconds\"\
+    : 30,\n        \"cache_ttl_seconds\": null,\n        \"fallback_agent_id\": null\n\
+    \      }\n    },\n    {\n      \"id\": \"fraud_check\",\n      \"agent_id\": \"\
+    2f565a6b-06b9-4a66-a882-4df2238dc1d4\",\n      \"agent_name\": \"fraud-detector-agent\"\
+    ,\n      \"agent_version\": \"latest\",\n      \"a2a_endpoint\": \"http://fraud-detector-agent.yard-invoice-fraud-report.svc.cluster.local:9000\"\
+    ,\n      \"input_schema\": {\n        \"type\": \"object\",\n        \"title\"\
+    : \"Input\",\n        \"required\": [\n          \"transaction\"\n        ],\n\
+    \        \"properties\": {\n          \"history\": {\n            \"type\": \"\
+    array\",\n            \"items\": {\n              \"type\": \"object\",\n    \
+    \          \"additionalProperties\": true\n            },\n            \"title\"\
+    : \"History\"\n          },\n          \"transaction\": {\n            \"type\"\
+    : \"object\",\n            \"title\": \"Transaction\",\n            \"additionalProperties\"\
+    : true\n          }\n        }\n      },\n      \"output_schema\": {\n       \
+    \ \"type\": \"object\",\n        \"title\": \"Output\",\n        \"properties\"\
+    : {\n          \"flags\": {\n            \"type\": \"array\",\n            \"\
+    items\": {\n              \"type\": \"string\"\n            },\n            \"\
+    title\": \"Flags\"\n          },\n          \"reasoning\": {\n            \"type\"\
+    : \"string\",\n            \"title\": \"Reasoning\",\n            \"default\"\
+    : \"\"\n          },\n          \"risk_level\": {\n            \"enum\": [\n \
+    \             \"low\",\n              \"medium\",\n              \"high\"\n  \
+    \          ],\n            \"type\": \"string\",\n            \"title\": \"Risk\
+    \ Level\",\n            \"default\": \"low\"\n          },\n          \"risk_score\"\
+    : {\n            \"type\": \"number\",\n            \"title\": \"Risk Score\"\
+    ,\n            \"default\": 0.0\n          },\n          \"recommended_action\"\
+    : {\n            \"enum\": [\n              \"allow\",\n              \"review\"\
+    ,\n              \"block\"\n            ],\n            \"type\": \"string\",\n\
+    \            \"title\": \"Recommended Action\",\n            \"default\": \"allow\"\
+    \n          }\n        }\n      },\n      \"config\": {\n        \"retries\":\
+    \ 2,\n        \"on_failure\": \"abort\",\n        \"input_mapping\": null,\n \
+    \       \"memory_access\": \"read-write\",\n        \"retry_backoff\": \"fixed\"\
+    ,\n        \"system_prompt\": null,\n        \"output_mapping\": null,\n     \
+    \   \"rate_limit_rpm\": null,\n        \"retry_delay_ms\": 1000,\n        \"timeout_seconds\"\
+    : 30,\n        \"cache_ttl_seconds\": null,\n        \"fallback_agent_id\": null\n\
+    \      }\n    },\n    {\n      \"id\": \"report\",\n      \"agent_id\": \"69d1924f-740d-47a0-9c6c-75db27f1ace6\"\
+    ,\n      \"agent_name\": \"report-generator-agent\",\n      \"agent_version\"\
+    : \"latest\",\n      \"a2a_endpoint\": \"http://report-generator-agent.yard-invoice-fraud-report.svc.cluster.local:9000\"\
+    ,\n      \"input_schema\": {\n        \"type\": \"object\",\n        \"title\"\
+    : \"Input\",\n        \"required\": [\n          \"data\"\n        ],\n      \
+    \  \"properties\": {\n          \"data\": {\n            \"type\": \"object\"\
+    ,\n            \"title\": \"Data\",\n            \"additionalProperties\": true\n\
+    \          },\n          \"format\": {\n            \"enum\": [\n            \
+    \  \"narrative\",\n              \"bullets\",\n              \"executive_summary\"\
+    \n            ],\n            \"type\": \"string\",\n            \"title\": \"\
+    Format\",\n            \"default\": \"narrative\"\n          },\n          \"\
+    report_type\": {\n            \"enum\": [\n              \"financial\",\n    \
+    \          \"compliance\",\n              \"performance\",\n              \"summary\"\
+    \n            ],\n            \"type\": \"string\",\n            \"title\": \"\
+    Report Type\",\n            \"default\": \"summary\"\n          }\n        }\n\
+    \      },\n      \"output_schema\": {\n        \"type\": \"object\",\n       \
+    \ \"title\": \"Output\",\n        \"properties\": {\n          \"title\": {\n\
+    \            \"type\": \"string\",\n            \"title\": \"Title\",\n      \
+    \      \"default\": \"\"\n          },\n          \"format\": {\n            \"\
+    type\": \"string\",\n            \"title\": \"Format\",\n            \"default\"\
+    : \"narrative\"\n          },\n          \"sections\": {\n            \"type\"\
+    : \"array\",\n            \"items\": {\n              \"type\": \"object\",\n\
+    \              \"additionalProperties\": true\n            },\n            \"\
+    title\": \"Sections\"\n          },\n          \"report_type\": {\n          \
+    \  \"type\": \"string\",\n            \"title\": \"Report Type\",\n          \
+    \  \"default\": \"summary\"\n          },\n          \"key_findings\": {\n   \
+    \         \"type\": \"array\",\n            \"items\": {\n              \"type\"\
+    : \"string\"\n            },\n            \"title\": \"Key Findings\"\n      \
+    \    },\n          \"recommendations\": {\n            \"type\": \"array\",\n\
+    \            \"items\": {\n              \"type\": \"string\"\n            },\n\
+    \            \"title\": \"Recommendations\"\n          },\n          \"executive_summary\"\
+    : {\n            \"type\": \"string\",\n            \"title\": \"Executive Summary\"\
+    ,\n            \"default\": \"\"\n          },\n          \"data_quality_notes\"\
+    : {\n            \"type\": \"string\",\n            \"title\": \"Data Quality\
+    \ Notes\",\n            \"default\": \"\"\n          }\n        }\n      },\n\
+    \      \"config\": {\n        \"retries\": 2,\n        \"on_failure\": \"abort\"\
+    ,\n        \"input_mapping\": null,\n        \"memory_access\": \"read-write\"\
+    ,\n        \"retry_backoff\": \"fixed\",\n        \"system_prompt\": null,\n \
+    \       \"output_mapping\": null,\n        \"rate_limit_rpm\": null,\n       \
+    \ \"retry_delay_ms\": 1000,\n        \"timeout_seconds\": 30,\n        \"cache_ttl_seconds\"\
+    : null,\n        \"fallback_agent_id\": null\n      }\n    }\n  ]\n}"
+kind: ConfigMap
+metadata:
+  name: yard-system-spec
+  namespace: yard-invoice-fraud-report

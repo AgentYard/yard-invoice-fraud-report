@@ -1,0 +1,13 @@
+system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+node_id: extract
+transport_mode: centralized
+input_mode: http
+output_mode: sync
+memory:
+  reads: []
+  writes:
+  - invoice_extraction
+  scope: system
+failure:
+  mode: retry
+  max_retries: 3

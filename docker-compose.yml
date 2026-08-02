@@ -1,0 +1,106 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 5s
+      timeout: 3s
+  orchestrator:
+    image: agentyard/orchestrator:latest
+    ports:
+    - 8080:8080
+    environment:
+      YARD_SYSTEM_ID: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+      YARD_TRANSPORT: http
+      YARD_REDIS_URL: redis://redis:6379
+      YARD_ENGINE_TYPE: chain_executor
+      YARD_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    depends_on:
+      redis:
+        condition: service_healthy
+  invoice-processor-agent:
+    image: agentyard-invoice-processor-agent:latest
+    environment:
+      YARD_TRANSPORT: http
+      YARD_SYSTEM_ID: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+      YARD_NODE_ID: extract
+      YARD_REDIS_URL: redis://redis:6379
+      YARD_PORT: '9000'
+      YARD_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      YARD_LLM_PROVIDER: bedrock
+      YARD_MEMORY: shared_bus
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - python -c "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    configs:
+    - source: yard_cfg_extract
+      target: /yard/config.yaml
+  fraud-detector-agent:
+    image: agentyard-fraud-detector-agent:latest
+    environment:
+      YARD_TRANSPORT: http
+      YARD_SYSTEM_ID: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+      YARD_NODE_ID: fraud_check
+      YARD_REDIS_URL: redis://redis:6379
+      YARD_PORT: '9000'
+      YARD_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      YARD_LLM_PROVIDER: bedrock
+      YARD_MEMORY: shared_bus
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - python -c "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    configs:
+    - source: yard_cfg_fraud_check
+      target: /yard/config.yaml
+  report-generator-agent:
+    image: 742851378787.dkr.ecr.us-east-1.amazonaws.com/agentyard-report-generator-agent:latest
+    environment:
+      YARD_TRANSPORT: http
+      YARD_SYSTEM_ID: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+      YARD_NODE_ID: report
+      YARD_REDIS_URL: redis://redis:6379
+      YARD_PORT: '9000'
+      YARD_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      YARD_LLM_PROVIDER: bedrock
+      YARD_MEMORY: shared_bus
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - python -c "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    configs:
+    - source: yard_cfg_report
+      target: /yard/config.yaml
+networks:
+  default:
+    name: yard-invoice-fraud-report
+configs:
+  yard_cfg_extract:
+    file: ./yard-config-extract.yaml
+  yard_cfg_fraud_check:
+    file: ./yard-config-fraud_check.yaml
+  yard_cfg_report:
+    file: ./yard-config-report.yaml
