@@ -466,38 +466,39 @@ data:
     \ dev\nerror_recovery:\n  circuit_breaker_enabled: true\n  circuit_breaker_reset_seconds:\
     \ 60\n  circuit_breaker_threshold: 3\n  dead_letter_queue: true\n  global_timeout_seconds:\
     \ 180\n  max_total_retries: 10\n  on_system_failure: return_partial\ngithub_repo_url:\
-    \ null\nglobal_token: null\nid: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nmemory_config:\n\
-    \  initial_context: null\n  max_memory_keys: 100\n  memory_ttl_seconds: null\n\
-    \  open: true\n  persistence: session\n  schema: null\n  strategy: shared_bus\n\
-    \  strict: false\nname: Invoice Fraud Report\nnamespace: acme/finance\nnodes:\n\
-    - agent_id: 4dacef11-4a27-4344-975b-08283bcff78d\n  agent_version: latest\n  config:\n\
-    \    cache_ttl_seconds: null\n    fallback_agent_id: null\n    input_mapping:\
-    \ null\n    memory_access: read-write\n    on_failure: abort\n    output_mapping:\
-    \ null\n    rate_limit_rpm: null\n    retries: 2\n    retry_backoff: fixed\n \
-    \   retry_delay_ms: 1000\n    system_prompt: null\n    timeout_seconds: 30\n \
-    \ id: extract\n  position:\n    x: 100.0\n    y: 250.0\n- agent_id: 2f565a6b-06b9-4a66-a882-4df2238dc1d4\n\
+    \ https://github.com/AgentYard/yard-invoice-fraud-report\nglobal_token: null\n\
+    id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nmemory_config:\n  initial_context: null\n\
+    \  max_memory_keys: 100\n  memory_ttl_seconds: null\n  open: true\n  persistence:\
+    \ session\n  schema: null\n  strategy: shared_bus\n  strict: false\nname: Invoice\
+    \ Fraud Report\nnamespace: acme/finance\nnodes:\n- agent_id: 4dacef11-4a27-4344-975b-08283bcff78d\n\
     \  agent_version: latest\n  config:\n    cache_ttl_seconds: null\n    fallback_agent_id:\
     \ null\n    input_mapping: null\n    memory_access: read-write\n    on_failure:\
     \ abort\n    output_mapping: null\n    rate_limit_rpm: null\n    retries: 2\n\
     \    retry_backoff: fixed\n    retry_delay_ms: 1000\n    system_prompt: null\n\
-    \    timeout_seconds: 30\n  id: fraud_check\n  position:\n    x: 450.0\n    y:\
-    \ 250.0\n- agent_id: 69d1924f-740d-47a0-9c6c-75db27f1ace6\n  agent_version: latest\n\
-    \  config:\n    cache_ttl_seconds: null\n    fallback_agent_id: null\n    input_mapping:\
+    \    timeout_seconds: 30\n  id: extract\n  position:\n    x: 100.0\n    y: 250.0\n\
+    - agent_id: 2f565a6b-06b9-4a66-a882-4df2238dc1d4\n  agent_version: latest\n  config:\n\
+    \    cache_ttl_seconds: null\n    fallback_agent_id: null\n    input_mapping:\
     \ null\n    memory_access: read-write\n    on_failure: abort\n    output_mapping:\
     \ null\n    rate_limit_rpm: null\n    retries: 2\n    retry_backoff: fixed\n \
     \   retry_delay_ms: 1000\n    system_prompt: null\n    timeout_seconds: 30\n \
-    \ id: report\n  position:\n    x: 800.0\n    y: 250.0\nobservability:\n  log_level:\
-    \ info\n  metrics_enabled: true\n  trace_enabled: true\n  trace_include_io: true\n\
-    \  trace_include_memory: true\n  webhook_on_complete: null\n  webhook_on_failure:\
-    \ null\norchestrator_config:\n  allow_partial_results: null\n  conditions: null\n\
-    \  engine_type: chain_executor\n  fallback_agent_id: null\n  fanout_timeout_seconds:\
-    \ null\n  llm_model: null\n  llm_temperature: null\n  max_iterations: 5\n  max_refinement_loops:\
-    \ null\n  merge_agent_id: null\n  merge_strategy: null\n  quality_metric_key:\
-    \ null\n  quality_threshold: null\n  reflection_enabled: null\n  reflection_prompt:\
-    \ null\n  routing_mode: sequential\n  system_prompt: 'Process an invoice end-to-end:\
-    \ extract structured data, screen for\n    fraud, summarize findings for finance\
-    \ leadership'\n  transport_mode: centralized\nowner: dev-admin\nstatus: deployed\n\
-    updated_at: '2026-08-01T23:28:16.245106Z'\nversion: 2\n"
+    \ id: fraud_check\n  position:\n    x: 450.0\n    y: 250.0\n- agent_id: 69d1924f-740d-47a0-9c6c-75db27f1ace6\n\
+    \  agent_version: latest\n  config:\n    cache_ttl_seconds: null\n    fallback_agent_id:\
+    \ null\n    input_mapping: null\n    memory_access: read-write\n    on_failure:\
+    \ abort\n    output_mapping: null\n    rate_limit_rpm: null\n    retries: 2\n\
+    \    retry_backoff: fixed\n    retry_delay_ms: 1000\n    system_prompt: null\n\
+    \    timeout_seconds: 30\n  id: report\n  position:\n    x: 800.0\n    y: 250.0\n\
+    observability:\n  log_level: info\n  metrics_enabled: true\n  trace_enabled: true\n\
+    \  trace_include_io: true\n  trace_include_memory: true\n  webhook_on_complete:\
+    \ null\n  webhook_on_failure: null\norchestrator_config:\n  allow_partial_results:\
+    \ null\n  conditions: null\n  engine_type: chain_executor\n  fallback_agent_id:\
+    \ null\n  fanout_timeout_seconds: null\n  llm_model: null\n  llm_temperature:\
+    \ null\n  max_iterations: 5\n  max_refinement_loops: null\n  merge_agent_id: null\n\
+    \  merge_strategy: null\n  quality_metric_key: null\n  quality_threshold: null\n\
+    \  reflection_enabled: null\n  reflection_prompt: null\n  routing_mode: sequential\n\
+    \  system_prompt: 'Process an invoice end-to-end: extract structured data, screen\
+    \ for\n    fraud, summarize findings for finance leadership'\n  transport_mode:\
+    \ centralized\nowner: dev-admin\nstatus: deployed\nupdated_at: '2026-08-02T04:37:37.198350Z'\n\
+    version: 4\n"
   transport: http
 kind: ConfigMap
 metadata:
