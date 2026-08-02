@@ -6,6 +6,7 @@ import time
 
 import httpx
 from fastapi import FastAPI
+from jsonpath_ng import parse as jsonpath_parse
 
 app = FastAPI(title="Invoice Fraud Report")
 
@@ -28,10 +29,38 @@ _ENDPOINT_OVERRIDES = json.loads(os.environ.get("YARD_AGENT_ENDPOINTS", "{}"))
 for _agent in AGENTS:
     _agent["endpoint"] = _ENDPOINT_OVERRIDES.get(_agent["id"], _agent["endpoint"])
 
-EDGES = [
-    {"id": "", "source": "extract", "target": "fraud_check", "transform": "explicit_mapping"},
-    {"id": "", "source": "fraud_check", "target": "report", "transform": "explicit_mapping"},
-]
+# Incoming-edge transform per target node id — {"strategy": ..., "mappings": {...}}.
+# Only the *previous* node's outgoing edge matters for a sequential chain
+# (each node has at most one incoming edge here), so this is keyed by target.
+EDGE_TRANSFORM_BY_TARGET = {
+    "fraud_check": {"llm_model": null, "llm_prompt": null, "mappings": {"transaction": "$"}, "strategy": "explicit_mapping"},
+    "report": {"llm_model": null, "llm_prompt": null, "mappings": {"data": "$"}, "strategy": "explicit_mapping"},
+}
+
+
+def apply_transform(transform: dict, source_output: dict) -> dict:
+    """Mirrors the platform's own transforms/*.py strategies, self-contained
+    since this generated container doesn't import the platform package.
+    Covers passthrough + explicit_mapping (what's actually exercised by
+    generated systems today); auto_negotiate/llm_transform/
+    supervisor_handles fall back to passthrough rather than silently
+    dropping fields — a real gap, but a safer default than guessing.
+    """
+    strategy = (transform or {}).get("strategy", "passthrough")
+    if strategy == "explicit_mapping":
+        mappings = (transform or {}).get("mappings") or {}
+        if not mappings:
+            return source_output
+        result = {}
+        for target_key, path_expr in mappings.items():
+            try:
+                matches = jsonpath_parse(path_expr).find(source_output)
+                if matches:
+                    result[target_key] = matches[0].value
+            except Exception:
+                pass
+        return result
+    return source_output
 
 
 async def call_agent(endpoint: str, input_data: dict) -> dict:
@@ -46,6 +75,9 @@ async def invoke(input: dict):
     current = input.get("input", input)
     trace = []
     for i, agent in enumerate(AGENTS):
+        transform = EDGE_TRANSFORM_BY_TARGET.get(agent["id"])
+        if transform is not None:
+            current = apply_transform(transform, current)
         start = time.monotonic()
         try:
             result = await call_agent(agent["endpoint"], current)

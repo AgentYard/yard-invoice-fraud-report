@@ -433,18 +433,39 @@ spec:
 ---
 apiVersion: v1
 data:
-  extract.yaml: "system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nnode_id: extract\n\
-    transport_mode: centralized\ninput_mode: http\noutput_mode: sync\nmemory:\n  reads:\
-    \ []\n  writes:\n  - invoice_extraction\n  scope: system\nfailure:\n  mode: retry\n\
-    \  max_retries: 3\n"
-  fraud_check.yaml: "system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nnode_id: fraud_check\n\
-    transport_mode: centralized\ninput_mode: http\noutput_mode: sync\nmemory:\n  reads:\
-    \ []\n  writes:\n  - fraud_assessment\n  scope: system\nfailure:\n  mode: retry\n\
-    \  max_retries: 3\n"
-  report.yaml: "system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e\nnode_id: report\n\
-    transport_mode: centralized\ninput_mode: http\noutput_mode: sync\nmemory:\n  reads:\
-    \ []\n  writes:\n  - generated_report\n  scope: system\nfailure:\n  mode: retry\n\
-    \  max_retries: 3\n"
+  extract.yaml: 'system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+
+    node_id: extract
+
+    transport_mode: centralized
+
+    input_mode: http
+
+    output_mode: sync
+
+    '
+  fraud_check.yaml: 'system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+
+    node_id: fraud_check
+
+    transport_mode: centralized
+
+    input_mode: http
+
+    output_mode: sync
+
+    '
+  report.yaml: 'system_id: e136bd17-a3df-45b3-a1a3-7ed3cdc2f58e
+
+    node_id: report
+
+    transport_mode: centralized
+
+    input_mode: http
+
+    output_mode: sync
+
+    '
 kind: ConfigMap
 metadata:
   name: yard-node-configs
@@ -497,8 +518,8 @@ data:
     \  reflection_enabled: null\n  reflection_prompt: null\n  routing_mode: sequential\n\
     \  system_prompt: 'Process an invoice end-to-end: extract structured data, screen\
     \ for\n    fraud, summarize findings for finance leadership'\n  transport_mode:\
-    \ centralized\nowner: dev-admin\nstatus: deployed\nupdated_at: '2026-08-02T04:37:37.198350Z'\n\
-    version: 4\n"
+    \ centralized\nowner: dev-admin\nstatus: deployed\nupdated_at: '2026-08-02T14:56:53.388973Z'\n\
+    version: 6\n"
   transport: http
 kind: ConfigMap
 metadata:

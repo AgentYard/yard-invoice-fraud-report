@@ -3,11 +3,3 @@ node_id: fraud_check
 transport_mode: centralized
 input_mode: http
 output_mode: sync
-memory:
-  reads: []
-  writes:
-  - fraud_assessment
-  scope: system
-failure:
-  mode: retry
-  max_retries: 3

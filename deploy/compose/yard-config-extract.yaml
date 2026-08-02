@@ -3,11 +3,3 @@ node_id: extract
 transport_mode: centralized
 input_mode: http
 output_mode: sync
-memory:
-  reads: []
-  writes:
-  - invoice_extraction
-  scope: system
-failure:
-  mode: retry
-  max_retries: 3
