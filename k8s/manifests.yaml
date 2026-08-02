@@ -518,8 +518,8 @@ data:
     \  reflection_enabled: null\n  reflection_prompt: null\n  routing_mode: sequential\n\
     \  system_prompt: 'Process an invoice end-to-end: extract structured data, screen\
     \ for\n    fraud, summarize findings for finance leadership'\n  transport_mode:\
-    \ centralized\nowner: dev-admin\nstatus: deployed\nupdated_at: '2026-08-02T14:56:53.388973Z'\n\
-    version: 6\n"
+    \ centralized\nowner: dev-admin\nstatus: deployed\nupdated_at: '2026-08-02T15:27:37.064937Z'\n\
+    version: 8\n"
   transport: http
 kind: ConfigMap
 metadata:

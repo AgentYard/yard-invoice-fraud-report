@@ -32,9 +32,20 @@ for _agent in AGENTS:
 # Incoming-edge transform per target node id — {"strategy": ..., "mappings": {...}}.
 # Only the *previous* node's outgoing edge matters for a sequential chain
 # (each node has at most one incoming edge here), so this is keyed by target.
+# Each field is rendered as its own JSON string (double `tojson`) rather
+# than inline dict/list syntax — a bare `tojson` emits real JSON
+# (null/true/false), which isn't valid Python; json.loads() per field turns
+# it back into a real value. Only strategy + mappings are carried through —
+# the only two apply_transform() below actually reads.
 EDGE_TRANSFORM_BY_TARGET = {
-    "fraud_check": {"llm_model": null, "llm_prompt": null, "mappings": {"transaction": "$"}, "strategy": "explicit_mapping"},
-    "report": {"llm_model": null, "llm_prompt": null, "mappings": {"data": "$"}, "strategy": "explicit_mapping"},
+    "fraud_check": {
+        "strategy": "explicit_mapping",
+        "mappings": json.loads("{\"transaction\": \"$\"}"),
+    },
+    "report": {
+        "strategy": "explicit_mapping",
+        "mappings": json.loads("{\"data\": \"$\"}"),
+    },
 }
 
 
